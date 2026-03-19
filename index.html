@@ -109,6 +109,35 @@
   .footer{border-top:1px solid var(--border);padding:1.5rem 3rem;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);}
   .footer span{color:var(--text);}
 
+
+  .interactive-section{margin-bottom:28px;}
+  .cat-filter-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+  .cat-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:500;border:1px solid var(--border2);background:var(--bg2);color:var(--muted);cursor:pointer;transition:all .18s;white-space:nowrap;}
+  .cat-btn:hover{border-color:rgba(232,56,74,0.5);color:var(--text);}
+  .cat-btn.active{background:rgba(232,56,74,0.15);border-color:rgba(232,56,74,0.6);color:#f87171;}
+  .drilldown-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.5rem;display:none;}
+  .drilldown-panel.visible{display:block;animation:fadeIn .2s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .drilldown-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
+  .drilldown-title{font-size:15px;font-weight:600;color:var(--text);}
+  .drilldown-title span{color:#e8384a;}
+  .drilldown-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .dd-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1.25rem;}
+  .dd-card-title{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;}
+  .dd-stat-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);}
+  .dd-stat-row:last-child{border-bottom:none;}
+  .dd-stat-label{font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .dd-class-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+  .dd-stat-vals{display:flex;gap:16px;align-items:center;}
+  .dd-open{font-size:13px;font-weight:500;color:#f87171;font-family:'DM Mono',monospace;}
+  .dd-closed{font-size:13px;font-weight:500;color:#4ade80;font-family:'DM Mono',monospace;}
+  .dd-bar-wrap{width:120px;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;}
+  .dd-bar-fill{height:100%;border-radius:3px;background:#e8384a;}
+  .dd-legend{display:flex;gap:14px;margin-top:.75rem;}
+  .dd-leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+  .dd-leg-dot{width:8px;height:8px;border-radius:50%;}
+  .dd-total-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;font-size:11px;font-weight:500;background:rgba(232,56,74,0.1);color:#f87171;border:1px solid rgba(232,56,74,0.2);}
+  @media(max-width:900px){.drilldown-grid{grid-template-columns:1fr;}}
   @media(max-width:900px){
     .metrics-grid{grid-template-columns:repeat(2,1fr);}
     .charts-row{grid-template-columns:1fr;}
@@ -177,6 +206,37 @@
       <div class="metric-label">Resolution Rate</div>
       <div class="metric-val ratio" id="kpi-rate">—</div>
       <div class="metric-sub" id="kpi-rate-sub">—</div>
+    </div>
+  </div>
+
+
+  <p class="section-title" style="margin-top:0">Category Explorer <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted);margin-left:6px;">Class A &amp; B — click a category to drill down</span></p>
+  <div class="interactive-section">
+    <div class="cat-filter-row" id="cat-buttons"></div>
+    <div class="drilldown-panel" id="drilldown-panel">
+      <div class="drilldown-header">
+        <div class="drilldown-title">Open vs Closed — <span id="dd-cat-name">—</span></div>
+        <div class="dd-total-badge" id="dd-total-badge">—</div>
+      </div>
+      <div class="drilldown-grid">
+        <div class="dd-card">
+          <div class="dd-card-title">Class A breakdown</div>
+          <div id="dd-classA-rows"></div>
+          <div class="dd-legend">
+            <div class="dd-leg-item"><div class="dd-leg-dot" style="background:#f43f5e"></div>Open</div>
+            <div class="dd-leg-item"><div class="dd-leg-dot" style="background:#22c55e"></div>Closed</div>
+          </div>
+        </div>
+        <div class="dd-card">
+          <div class="dd-card-title">Class B breakdown</div>
+          <div id="dd-classB-rows"></div>
+          <div class="dd-legend">
+            <div class="dd-leg-item"><div class="dd-leg-dot" style="background:#f43f5e"></div>Open</div>
+            <div class="dd-leg-item"><div class="dd-leg-dot" style="background:#22c55e"></div>Closed</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;position:relative;height:260px;"><canvas id="c_drilldown"></canvas></div>
     </div>
   </div>
 
@@ -458,6 +518,90 @@ function buildDashboard(rows){
       </div></td>
     </tr>`;
   });
+
+
+  // ── INTERACTIVE CATEGORY EXPLORER (Class A & B) ──────────────────────────
+  const abRows = rows.filter(r=>r['Site Class']==='CLASS A'||r['Site Class']==='CLASS B');
+  const allCatsAB = [...new Set(abRows.map(r=>r['Snag Category']))].filter(Boolean).sort();
+
+  // Build category buttons
+  const btnContainer = document.getElementById('cat-buttons');
+  btnContainer.innerHTML = '';
+  allCatsAB.forEach(cat=>{
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn';
+    btn.textContent = cat.charAt(0)+cat.slice(1).toLowerCase();
+    btn.dataset.cat = cat;
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderDrilldown(cat, abRows);
+    });
+    btnContainer.appendChild(btn);
+  });
+
+  function renderDrilldown(cat, allAB){
+    const catRows = allAB.filter(r=>r['Snag Category']===cat);
+    const panel = document.getElementById('drilldown-panel');
+    panel.classList.remove('visible');
+    void panel.offsetWidth; // force reflow for animation
+    panel.classList.add('visible');
+
+    document.getElementById('dd-cat-name').textContent = cat.charAt(0)+cat.slice(1).toLowerCase();
+    document.getElementById('dd-total-badge').textContent = n(catRows.length)+' total snags';
+
+    ['CLASS A','CLASS B'].forEach(cls=>{
+      const clsRows = catRows.filter(r=>r['Site Class']===cls);
+      const open   = clsRows.filter(r=>r.SnagFlag==='KEEP_OPEN').length;
+      const closed = clsRows.filter(r=>r.SnagFlag==='CLOSED_UNIQUE').length;
+      const total  = clsRows.length;
+      const resRate= total>0 ? Math.round(closed/total*100) : 0;
+      const key    = cls==='CLASS A'?'classA':'classB';
+
+      const html = total===0
+        ? `<div style="font-size:13px;color:var(--muted);padding:8px 0;">No snags in this category</div>`
+        : `<div class="dd-stat-row">
+            <div class="dd-stat-label">Open</div>
+            <div class="dd-stat-vals">
+              <span class="dd-open">${n(open)}</span>
+              <div class="dd-bar-wrap"><div class="dd-bar-fill" style="width:${total>0?Math.round(open/total*100):0}%;background:#f43f5e;"></div></div>
+            </div>
+          </div>
+          <div class="dd-stat-row">
+            <div class="dd-stat-label">Closed</div>
+            <div class="dd-stat-vals">
+              <span class="dd-closed">${n(closed)}</span>
+              <div class="dd-bar-wrap"><div class="dd-bar-fill" style="width:${resRate}%;background:#22c55e;"></div></div>
+            </div>
+          </div>
+          <div class="dd-stat-row" style="border-bottom:none;margin-top:4px;">
+            <div class="dd-stat-label" style="color:var(--muted);font-size:12px;">Resolution rate</div>
+            <div class="dd-stat-vals">
+              <span style="font-family:'DM Mono',monospace;font-size:13px;color:${resRate>80?'#22c55e':resRate>60?'#f59e0b':'#f43f5e'}">${resRate}%</span>
+            </div>
+          </div>`;
+
+      document.getElementById('dd-'+key+'-rows').innerHTML = html;
+    });
+
+    // Grouped bar chart: Class A & B, Open vs Closed
+    const aOpen   = catRows.filter(r=>r['Site Class']==='CLASS A'&&r.SnagFlag==='KEEP_OPEN').length;
+    const aClosed = catRows.filter(r=>r['Site Class']==='CLASS A'&&r.SnagFlag==='CLOSED_UNIQUE').length;
+    const bOpen   = catRows.filter(r=>r['Site Class']==='CLASS B'&&r.SnagFlag==='KEEP_OPEN').length;
+    const bClosed = catRows.filter(r=>r['Site Class']==='CLASS B'&&r.SnagFlag==='CLOSED_UNIQUE').length;
+
+    makeChart('c_drilldown',{type:'bar',data:{
+      labels:['Class A','Class B'],
+      datasets:[
+        {label:'Open',  data:[aOpen,bOpen],  backgroundColor:RED+'cc',borderRadius:6,borderWidth:0},
+        {label:'Closed',data:[aClosed,bClosed],backgroundColor:GREEN+'cc',borderRadius:6,borderWidth:0}
+      ]
+    },options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:tickC,font:{size:11},boxWidth:12}}},
+      scales:scaleOpts(false,false)
+    }});
+  }
+  // ── END CATEGORY EXPLORER ─────────────────────────────────────────────────
 
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='block';
